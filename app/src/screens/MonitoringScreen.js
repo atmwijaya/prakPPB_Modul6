@@ -14,9 +14,15 @@ import { Api } from "../services/api";
 import { DataTable } from "../components/DataTable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext.js";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 export function MonitoringScreen({ navigation }) {
-  const { temperature, timestamp, connectionState, error: mqttError } = useMqttSensor();
+  const {
+    temperature,
+    timestamp,
+    connectionState,
+    error: mqttError,
+  } = useMqttSensor();
   const [readings, setReadings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,26 +59,30 @@ export function MonitoringScreen({ navigation }) {
 
   const handleControlAccess = () => {
     if (isAuthenticated) {
-      navigation.navigate('MainTabs', { screen: 'Control' });
+      navigation.navigate("MainTabs", { screen: "Control" });
     } else {
-      navigation.navigate('Login');
+      navigation.navigate("Login");
     }
   };
 
   const getConnectionStatusColor = () => {
-    switch(connectionState) {
-      case 'Connected': return '#10b981';
-      case 'Connecting': return '#f59e0b';
-      case 'Disconnected': return '#ef4444';
-      default: return '#6b7280';
+    switch (connectionState) {
+      case "Connected":
+        return "#10b981";
+      case "Connecting":
+        return "#f59e0b";
+      case "Disconnected":
+        return "#ef4444";
+      default:
+        return "#6b7280";
     }
   };
 
   const getTemperatureColor = (temp) => {
-    if (typeof temp !== 'number') return '#6b7280';
-    if (temp > 30) return '#ef4444';
-    if (temp > 25) return '#f59e0b';
-    return '#10b981';
+    if (typeof temp !== "number") return "#6b7280";
+    if (temp > 30) return "#ef4444";
+    if (temp > 25) return "#f59e0b";
+    return "#10b981";
   };
 
   return (
@@ -93,13 +103,23 @@ export function MonitoringScreen({ navigation }) {
           </View>
           <View style={styles.authSection}>
             {isAuthenticated ? (
-              <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-                <Text style={styles.logoutText}>Logout</Text>
-              </TouchableOpacity>
+              <View style={styles.authButtons}>
+                <TouchableOpacity
+                  style={styles.profileButton}
+                  onPress={() =>
+                    navigation.navigate("MainTabs", { screen: "Profile" })
+                  }
+                >
+                  <Ionicons name="person" size={20} color="#2563eb" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+                  <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
-              <TouchableOpacity 
-                style={styles.loginButton} 
-                onPress={() => navigation.navigate('Login')}
+              <TouchableOpacity
+                style={styles.loginButton}
+                onPress={() => navigation.navigate("Login")}
               >
                 <Text style={styles.loginText}>Login</Text>
               </TouchableOpacity>
@@ -111,29 +131,33 @@ export function MonitoringScreen({ navigation }) {
         <View style={styles.card}>
           <Text style={styles.title}>Realtime Temperature</Text>
           <View style={styles.valueRow}>
-            <Text style={[
-              styles.temperatureText,
-              { color: getTemperatureColor(temperature) }
-            ]}>
-              {typeof temperature === "number" ? `${temperature.toFixed(2)}°C` : "--"}
+            <Text
+              style={[
+                styles.temperatureText,
+                { color: getTemperatureColor(temperature) },
+              ]}
+            >
+              {typeof temperature === "number"
+                ? `${temperature.toFixed(2)}°C`
+                : "--"}
             </Text>
             <View style={styles.statusIndicator}>
-              <View 
+              <View
                 style={[
-                  styles.statusDot, 
-                  { backgroundColor: getConnectionStatusColor() }
-                ]} 
+                  styles.statusDot,
+                  { backgroundColor: getConnectionStatusColor() },
+                ]}
               />
               <Text style={styles.statusText}>{connectionState}</Text>
             </View>
           </View>
-          
+
           {timestamp && (
             <Text style={styles.metaText}>
               Last update: {new Date(timestamp).toLocaleString()}
             </Text>
           )}
-          
+
           {mqttError && (
             <Text style={styles.errorText}>MQTT error: {mqttError}</Text>
           )}
@@ -142,20 +166,22 @@ export function MonitoringScreen({ navigation }) {
         {/* Quick Actions Card */}
         <View style={styles.card}>
           <Text style={styles.title}>Quick Actions</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.controlButton,
-              !isAuthenticated && styles.disabledButton
-            ]} 
+              !isAuthenticated && styles.disabledButton,
+            ]}
             onPress={handleControlAccess}
             disabled={!isAuthenticated}
           >
             <Text style={styles.controlButtonText}>
-              {isAuthenticated ? 'Go to Control Panel' : 'Login to Access Control'}
+              {isAuthenticated
+                ? "Go to Control Panel"
+                : "Login to Access Control"}
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.refreshButton}
             onPress={onRefresh}
             disabled={refreshing}
@@ -173,7 +199,7 @@ export function MonitoringScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Triggered Readings History</Text>
           {loading && <ActivityIndicator size="small" />}
         </View>
-        
+
         {apiError && (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>
@@ -188,22 +214,27 @@ export function MonitoringScreen({ navigation }) {
               {
                 key: "recorded_at",
                 title: "Timestamp",
-                render: (value) => (value ? new Date(value).toLocaleString() : "--"),
-                width: '40%',
+                render: (value) =>
+                  value ? new Date(value).toLocaleString() : "--",
+                width: "40%",
               },
               {
                 key: "temperature",
                 title: "Temperature (°C)",
                 render: (value) =>
-                  typeof value === "number" ? `${Number(value).toFixed(2)}` : "--",
-                width: '30%',
+                  typeof value === "number"
+                    ? `${Number(value).toFixed(2)}`
+                    : "--",
+                width: "30%",
               },
               {
                 key: "threshold_value",
                 title: "Threshold (°C)",
                 render: (value) =>
-                  typeof value === "number" ? `${Number(value).toFixed(2)}` : "--",
-                width: '30%',
+                  typeof value === "number"
+                    ? `${Number(value).toFixed(2)}`
+                    : "--",
+                width: "30%",
               },
             ]}
             data={readings}
@@ -212,9 +243,12 @@ export function MonitoringScreen({ navigation }) {
         ) : (
           !loading && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No sensor readings available</Text>
+              <Text style={styles.emptyStateText}>
+                No sensor readings available
+              </Text>
               <Text style={styles.emptyStateSubtext}>
-                Sensor data will appear here when temperature thresholds are triggered
+                Sensor data will appear here when temperature thresholds are
+                triggered
               </Text>
             </View>
           )
@@ -227,11 +261,11 @@ export function MonitoringScreen({ navigation }) {
             <View style={styles.statusItem}>
               <Text style={styles.statusLabel}>MQTT Connection</Text>
               <View style={styles.statusValue}>
-                <View 
+                <View
                   style={[
-                    styles.statusDot, 
-                    { backgroundColor: getConnectionStatusColor() }
-                  ]} 
+                    styles.statusDot,
+                    { backgroundColor: getConnectionStatusColor() },
+                  ]}
                 />
                 <Text style={styles.statusText}>{connectionState}</Text>
               </View>
@@ -243,7 +277,7 @@ export function MonitoringScreen({ navigation }) {
             <View style={styles.statusItem}>
               <Text style={styles.statusLabel}>Authentication</Text>
               <Text style={styles.statusValueText}>
-                {isAuthenticated ? 'Logged In' : 'Public Access'}
+                {isAuthenticated ? "Logged In" : "Public Access"}
               </Text>
             </View>
           </View>
@@ -260,9 +294,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   authHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 20,
     paddingHorizontal: 4,
   },
@@ -271,13 +305,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1f2937",
   },
+  authButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileButton: {
+    backgroundColor: "#eff6ff",
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
   userText: {
     fontSize: 14,
     color: "#6b7280",
     marginTop: 4,
   },
   authSection: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   loginButton: {
     backgroundColor: "#2563eb",
@@ -329,9 +373,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fb',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fb",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -424,11 +468,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   statusGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   statusItem: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
   },
   statusLabel: {
@@ -437,8 +481,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statusValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   statusValueText: {
     fontSize: 14,

@@ -1,14 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { enableScreens } from "react-native-screens";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useAuth, AuthProvider } from "./src/context/AuthContext.js";
+import { AuthProvider, useAuth } from "./src/context/AuthContext.js";
 import { MonitoringScreen } from "./src/screens/MonitoringScreen";
 import { ControlScreen } from "./src/screens/ControlScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { ProfileScreen } from "./src/screens/ProfileScreen";
+import { SplashScreen } from "./src/screens/SplashScreen";
 import { assertConfig } from "./src/services/config";
 
 const Tab = createBottomTabNavigator();
@@ -30,13 +32,23 @@ function AuthenticatedTabs() {
         tabBarActiveTintColor: "#2563eb",
         tabBarInactiveTintColor: "#94a3b8",
         tabBarIcon: ({ color, size }) => {
-          const iconName = route.name === "Monitoring" ? "analytics" : "options";
+          let iconName;
+          
+          if (route.name === "Monitoring") {
+            iconName = "analytics";
+          } else if (route.name === "Control") {
+            iconName = "options";
+          } else if (route.name === "Profile") {
+            iconName = "person";
+          }
+          
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Monitoring" component={MonitoringScreen} />
       <Tab.Screen name="Control" component={ControlScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -46,7 +58,7 @@ function AppNavigator() {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return null; // Atau tampilkan loading screen
+    return <SplashScreen />;
   }
 
   return (
@@ -88,8 +100,24 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const [appIsReady, setAppIsReady] = useState(false);
+
   useEffect(() => {
-    assertConfig();
+    async function prepare() {
+      try {
+        // Pre-load resources, make API calls, etc.
+        await assertConfig();
+        
+        // Artificially delay for 2 seconds to show splash screen
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
   }, []);
 
   const theme = {
@@ -99,6 +127,10 @@ export default function App() {
       background: "#f8f9fb",
     },
   };
+
+  if (!appIsReady) {
+    return <SplashScreen />;
+  }
 
   return (
     <SafeAreaProvider>
