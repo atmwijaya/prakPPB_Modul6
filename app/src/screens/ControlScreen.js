@@ -9,14 +9,16 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { Api } from "../services/api.js";
-import { DataTable } from "../components/DataTable.js";
+import { Api } from "../services/api";
+import { DataTable } from "../components/DataTable";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext.js";
 
 export function ControlScreen() {
-  const [thresholdValue, setThresholdValue] = useState(30);
+  const [thresholdValue, setThresholdValue] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [history, setHistory] = useState([]);
@@ -28,7 +30,11 @@ export function ControlScreen() {
   const [itemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
+  const { isAuthenticated, user, logout } = useAuth();
+
   const fetchHistory = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
     setLoading(true);
     setError(null);
     try {
@@ -40,12 +46,12 @@ export function ControlScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useFocusEffect(
     useCallback(() => {
       fetchHistory();
-      setCurrentPage(1); // Reset ke halaman pertama saat focus
+      setCurrentPage(1);
     }, [fetchHistory])
   );
 
@@ -64,9 +70,19 @@ export function ControlScreen() {
   }, [totalItems, itemsPerPage]);
 
   const handleSubmit = useCallback(async () => {
+    if (!isAuthenticated) {
+      Alert.alert("Authentication Required", "Please login to set thresholds");
+      return;
+    }
+
     const valueNumber = Number(thresholdValue);
-    if (Number.isNaN(valueNumber)) {
-      setError("Please enter a numeric threshold.");
+    if (Number.isNaN(valueNumber) || thresholdValue === "") {
+      setError("Please enter a valid numeric threshold.");
+      return;
+    }
+
+    if (valueNumber < -50 || valueNumber > 100) {
+      setError("Please enter a threshold between -50°C and 100°C.");
       return;
     }
 
@@ -74,15 +90,17 @@ export function ControlScreen() {
     setError(null);
     try {
       await Api.createThreshold({ value: valueNumber, note });
+      setThresholdValue("");
       setNote("");
       await fetchHistory();
-      setCurrentPage(1); // Kembali ke halaman pertama setelah submit baru
+      setCurrentPage(1);
+      Alert.alert("Success", "Threshold updated successfully!");
     } catch (err) {
       setError(err.message);
     } finally {
       setSubmitting(false);
     }
-  }, [thresholdValue, note, fetchHistory]);
+  }, [thresholdValue, note, fetchHistory, isAuthenticated]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) {
@@ -96,111 +114,276 @@ export function ControlScreen() {
     }
   };
 
-  return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Configure Threshold</Text>
-          {latestThreshold !== null && (
-            <Text style={styles.metaText}>
-              Current threshold: {Number(latestThreshold).toFixed(2)}°C
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Jika tidak authenticated, tampilkan pesan error
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+        <View style={styles.container}>
+          <View style={styles.errorCard}>
+            <Text style={styles.errorIcon}>🔒</Text>
+            <Text style={styles.errorTitle}>Access Restricted</Text>
+            <Text style={styles.errorText}>
+              You need to be logged in to access the control panel and manage temperature thresholds.
             </Text>
-          )}
-          <Text style={styles.label}>Threshold (°C)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={String(thresholdValue)}
-            onChangeText={setThresholdValue}
-          />
-          <Text style={styles.label}>Note (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.noteInput]}
-            value={note}
-            onChangeText={setNote}
-            multiline
-            numberOfLines={3}
-            placeholder="Describe why you are changing the threshold"
-          />
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          <TouchableOpacity
-            style={[styles.button, submitting && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Save Threshold</Text>}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Threshold History</Text>
-          {loading && <ActivityIndicator />}
-        </View>
-
-        {/* Pagination Info */}
-        <View style={styles.paginationInfo}>
-          <Text style={styles.paginationText}>
-            Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} records
-          </Text>
-        </View>
-
-        <DataTable
-          columns={[
-            {
-              key: "created_at",
-              title: "Saved At",
-              render: (value) => (value ? new Date(value).toLocaleString() : "--"),
-            },
-            {
-              key: "value",
-              title: "Threshold (°C)",
-              render: (value) =>
-                typeof value === "number" ? `${Number(value).toFixed(2)}` : "--",
-            },
-            {
-              key: "note",
-              title: "Note",
-              render: (value) => value || "-",
-            },
-          ]}
-          data={paginatedHistory}
-          keyExtractor={(item) => item.id}
-        />
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <View style={styles.paginationContainer}>
-            <TouchableOpacity
-              style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
-              onPress={handlePrevPage}
-              disabled={currentPage === 1}
+            <TouchableOpacity 
+              style={styles.loginRedirectButton}
+              onPress={() => navigation.navigate('Login')}
             >
-              <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
-                Previous
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.pageIndicator}>
-              Page {currentPage} of {totalPages}
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
-              onPress={handleNextPage}
-              disabled={currentPage === totalPages}
-            >
-              <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
-                Next
-              </Text>
+              <Text style={styles.loginRedirectText}>Go to Login</Text>
             </TouchableOpacity>
           </View>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.container}>
+          {/* User Info Header */}
+          <View style={styles.userHeader}>
+            <View>
+              <Text style={styles.welcomeText}>Welcome back,</Text>
+              <Text style={styles.userEmail}>{user?.email}</Text>
+            </View>
+            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Threshold Configuration Card */}
+          <View style={styles.card}>
+            <Text style={styles.title}>Configure Temperature Threshold</Text>
+            
+            {latestThreshold !== null && (
+              <View style={styles.currentThreshold}>
+                <Text style={styles.currentThresholdLabel}>Current Active Threshold:</Text>
+                <Text style={styles.currentThresholdValue}>
+                  {Number(latestThreshold).toFixed(2)}°C
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>New Threshold (°C)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={thresholdValue}
+                onChangeText={setThresholdValue}
+                placeholder="Enter temperature value"
+                placeholderTextColor="#9ca3af"
+              />
+              <Text style={styles.inputHelp}>
+                Enter value between -50°C and 100°C
+              </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Note (Optional) 
+                <Text style={styles.optionalText}> - describe the reason for this change</Text>
+              </Text>
+              <TextInput
+                style={[styles.input, styles.noteInput]}
+                value={note}
+                onChangeText={setNote}
+                multiline
+                numberOfLines={3}
+                placeholder="e.g., Summer season adjustment, Equipment calibration, Safety precaution..."
+                placeholderTextColor="#9ca3af"
+                textAlignVertical="top"
+              />
+            </View>
+
+            {error && (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.button, submitting && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={submitting || !thresholdValue}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  Save Threshold Configuration
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Threshold History Section */}
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Threshold History</Text>
+              <Text style={styles.sectionSubtitle}>
+                Recent threshold configurations and changes
+              </Text>
+            </View>
+            {loading && <ActivityIndicator />}
+          </View>
+
+          {error && history.length === 0 && (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>Failed to load history: {error}</Text>
+            </View>
+          )}
+
+          {/* Pagination Info */}
+          {history.length > 0 && (
+            <View style={styles.paginationInfo}>
+              <Text style={styles.paginationText}>
+                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} records
+              </Text>
+              <TouchableOpacity 
+                style={styles.refreshButton}
+                onPress={fetchHistory}
+                disabled={loading}
+              >
+                <Text style={styles.refreshButtonText}>
+                  {loading ? "Refreshing..." : "Refresh"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {history.length > 0 ? (
+            <>
+              <DataTable
+                columns={[
+                  {
+                    key: "created_at",
+                    title: "Saved At",
+                    render: (value) => (value ? new Date(value).toLocaleString() : "--"),
+                    width: '35%',
+                  },
+                  {
+                    key: "value",
+                    title: "Threshold (°C)",
+                    render: (value) =>
+                      typeof value === "number" ? `${Number(value).toFixed(2)}` : "--",
+                    width: '25%',
+                  },
+                  {
+                    key: "note",
+                    title: "Note",
+                    render: (value) => value || "-",
+                    width: '40%',
+                  },
+                ]}
+                data={paginatedHistory}
+                keyExtractor={(item) => item.id}
+              />
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <View style={styles.paginationContainer}>
+                  <TouchableOpacity
+                    style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+                    onPress={handlePrevPage}
+                    disabled={currentPage === 1}
+                  >
+                    <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.pageNumbers}>
+                    {[...Array(Math.min(5, totalPages))].map((_, index) => {
+                      const pageNum = currentPage <= 3 
+                        ? index + 1 
+                        : currentPage >= totalPages - 2 
+                        ? totalPages - 4 + index 
+                        : currentPage - 2 + index;
+                      
+                      if (pageNum > 0 && pageNum <= totalPages) {
+                        return (
+                          <TouchableOpacity
+                            key={pageNum}
+                            style={[
+                              styles.pageNumber,
+                              currentPage === pageNum && styles.pageNumberActive
+                            ]}
+                            onPress={() => goToPage(pageNum)}
+                          >
+                            <Text style={[
+                              styles.pageNumberText,
+                              currentPage === pageNum && styles.pageNumberTextActive
+                            ]}>
+                              {pageNum}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      }
+                      return null;
+                    })}
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+                    onPress={handleNextPage}
+                    disabled={currentPage === totalPages}
+                  >
+                    <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
+                      Next
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          ) : (
+            !loading && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>📊</Text>
+                <Text style={styles.emptyStateText}>No threshold history yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Configure your first temperature threshold above to get started
+                </Text>
+              </View>
+            )
+          )}
+
+          {/* Quick Stats */}
+          {history.length > 0 && (
+            <View style={styles.statsCard}>
+              <Text style={styles.statsTitle}>Configuration Stats</Text>
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{totalItems}</Text>
+                  <Text style={styles.statLabel}>Total Configurations</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {latestThreshold ? `${Number(latestThreshold).toFixed(2)}°C` : '--'}
+                  </Text>
+                  <Text style={styles.statLabel}>Current Threshold</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {history.filter(item => item.note && item.note.trim() !== '').length}
+                  </Text>
+                  <Text style={styles.statLabel}>With Notes</Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -210,11 +393,39 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#f8f9fb",
   },
+  userHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: "#6b7280",
+  },
+  userEmail: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1f2937",
+    marginTop: 2,
+  },
+  logoutButton: {
+    backgroundColor: "#ef4444",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  logoutText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   card: {
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -222,21 +433,51 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 16,
+    color: "#1f2937",
+  },
+  currentThreshold: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0369a1',
+  },
+  currentThresholdLabel: {
+    fontSize: 14,
+    color: "#0369a1",
+    fontWeight: "500",
+  },
+  currentThresholdValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0369a1",
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
-    marginTop: 16,
     fontWeight: "600",
-    color: "#444",
+    color: "#374151",
+    marginBottom: 8,
+    fontSize: 15,
+  },
+  optionalText: {
+    fontWeight: "400",
+    color: "#6b7280",
+    fontSize: 13,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d0d0d0",
+    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 12,
-    marginTop: 8,
     fontSize: 16,
     backgroundColor: "#fff",
   },
@@ -244,46 +485,66 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: "top",
   },
+  inputHelp: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 4,
+  },
   button: {
-    marginTop: 20,
     backgroundColor: "#2563eb",
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 10,
     alignItems: "center",
+    marginTop: 8,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    backgroundColor: "#9ca3af",
   },
   buttonText: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 16,
   },
-  metaText: {
-    color: "#666",
-  },
-  errorText: {
-    marginTop: 12,
-    color: "#c82333",
-  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
+    alignItems: "flex-start",
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1f2937",
   },
-  // Pagination Styles
+  sectionSubtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    marginTop: 4,
+  },
   paginationInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
-    alignItems: "center",
+    paddingHorizontal: 4,
   },
   paginationText: {
     fontSize: 14,
-    color: "#666",
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  refreshButton: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#2563eb",
+  },
+  refreshButtonText: {
+    color: "#2563eb",
+    fontSize: 12,
     fontWeight: "500",
   },
   paginationContainer: {
@@ -312,9 +573,120 @@ const styles = StyleSheet.create({
   paginationButtonTextDisabled: {
     color: "#94a3b8",
   },
-  pageIndicator: {
+  pageNumbers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pageNumber: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginHorizontal: 2,
+  },
+  pageNumberActive: {
+    backgroundColor: "#2563eb",
+  },
+  pageNumberText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
     color: "#374151",
+  },
+  pageNumberTextActive: {
+    color: "#fff",
+  },
+  errorCard: {
+    backgroundColor: "#fef2f2",
+    padding: 16,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#ef4444",
+    marginBottom: 16,
+  },
+  errorIcon: {
+    fontSize: 48,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#ef4444",
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorText: {
+    color: "#ef4444",
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  loginRedirectButton: {
+    backgroundColor: "#2563eb",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  loginRedirectText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  emptyState: {
+    backgroundColor: "#fff",
+    padding: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  emptyStateIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6b7280",
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#9ca3af",
+    textAlign: "center",
+  },
+  statsCard: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  statsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1f2937",
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2563eb",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    textAlign: 'center',
   },
 });
