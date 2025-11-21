@@ -258,6 +258,28 @@ export function ControlScreen() {
               </View>
               {loading && <ActivityIndicator />}
             </View>
+            <DataTable
+          columns={[
+            {
+              key: "created_at",
+              title: "Saved At",
+              render: (value) => (value ? new Date(value).toLocaleString() : "--"),
+            },
+            {
+              key: "value",
+              title: "Threshold (°C)",
+              render: (value) =>
+                typeof value === "number" ? `${Number(value).toFixed(2)}` : "--",
+            },
+            {
+              key: "note",
+              title: "Note",
+              render: (value) => value || "-",
+            },
+          ]}
+          data={history}
+          keyExtractor={(item) => item.id}
+        />
 
             {error && history.length === 0 && (
               <View style={styles.errorCard}>
@@ -286,7 +308,7 @@ export function ControlScreen() {
             {history.length > 0 ? (
               <>
                 {/* Custom DataTable dengan Gesture Support */}
-                <View style={styles.dataTable}>
+                <View style={styles.DataTable}>
                   {/* Table Header */}
                   <View style={styles.tableHeader}>
                     <Text style={[styles.tableHeaderCell, { width: '35%' }]}>Saved At</Text>
@@ -586,7 +608,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   // Data Table Styles dengan Gesture Support
-  dataTable: {
+  DataTable: {
     backgroundColor: "#fff",
     borderRadius: 12,
     overflow: 'hidden',
