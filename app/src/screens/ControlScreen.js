@@ -16,6 +16,7 @@ import { Api } from "../services/api";
 import { DataTable } from "../components/DataTable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext.js";
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
 export function ControlScreen() {
   const [thresholdValue, setThresholdValue] = useState("");
@@ -120,271 +121,308 @@ export function ControlScreen() {
     }
   };
 
+  // Swipe gesture untuk table rows
+  const renderTableRowActions = (item) => {
+    return (
+      <TouchableOpacity
+        style={styles.swipeAction}
+        onPress={() => {
+          Alert.alert(
+            "Threshold Details",
+            `Value: ${item.value}°C\nNote: ${item.note || "No note"}\nCreated: ${new Date(item.created_at).toLocaleString()}`
+          );
+        }}
+      >
+        <Text style={styles.swipeActionText}>Details</Text>
+      </TouchableOpacity>
+    );
+  };
+
   // Jika tidak authenticated, tampilkan pesan error
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-        <View style={styles.container}>
-          <View style={styles.errorCard}>
-            <Text style={styles.errorIcon}>🔒</Text>
-            <Text style={styles.errorTitle}>Access Restricted</Text>
-            <Text style={styles.errorText}>
-              You need to be logged in to access the control panel and manage temperature thresholds.
-            </Text>
-            <TouchableOpacity 
-              style={styles.loginRedirectButton}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={styles.loginRedirectText}>Go to Login</Text>
-            </TouchableOpacity>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+          <View style={styles.container}>
+            <View style={styles.errorCard}>
+              <Text style={styles.errorIcon}>🔒</Text>
+              <Text style={styles.errorTitle}>Access Restricted</Text>
+              <Text style={styles.errorText}>
+                You need to be logged in to access the control panel and manage temperature thresholds.
+              </Text>
+              <TouchableOpacity 
+                style={styles.loginRedirectButton}
+                onPress={() => navigation.navigate('Login')}
+              >
+                <Text style={styles.loginRedirectText}>Go to Login</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.container}>
-          {/* User Info Header */}
-          <View style={styles.userHeader}>
-            <View>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.userEmail}>{user?.email}</Text>
-            </View>
-            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Threshold Configuration Card */}
-          <View style={styles.card}>
-            <Text style={styles.title}>Configure Temperature Threshold</Text>
-            
-            {latestThreshold !== null && (
-              <View style={styles.currentThreshold}>
-                <Text style={styles.currentThresholdLabel}>Current Active Threshold:</Text>
-                <Text style={styles.currentThresholdValue}>
-                  {Number(latestThreshold).toFixed(2)}°C
-                </Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView contentContainerStyle={styles.container}>
+            {/* User Info Header */}
+            <View style={styles.userHeader}>
+              <View>
+                <Text style={styles.welcomeText}>Welcome back,</Text>
+                <Text style={styles.userEmail}>{user?.email}</Text>
               </View>
-            )}
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>New Threshold (°C)</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                value={thresholdValue}
-                onChangeText={setThresholdValue}
-                placeholder="Enter temperature value"
-                placeholderTextColor="#9ca3af"
-              />
-              <Text style={styles.inputHelp}>
-                Enter value between -50°C and 100°C
-              </Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                Note (Optional) 
-                <Text style={styles.optionalText}> - describe the reason for this change</Text>
-              </Text>
-              <TextInput
-                style={[styles.input, styles.noteInput]}
-                value={note}
-                onChangeText={setNote}
-                multiline
-                numberOfLines={3}
-                placeholder="e.g., Summer season adjustment, Equipment calibration, Safety precaution..."
-                placeholderTextColor="#9ca3af"
-                textAlignVertical="top"
-              />
-            </View>
-
-            {error && (
-              <View style={styles.errorCard}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.button, submitting && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={submitting || !thresholdValue}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  Save Threshold Configuration
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Threshold History Section */}
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Threshold History</Text>
-              <Text style={styles.sectionSubtitle}>
-                Recent threshold configurations and changes
-              </Text>
-            </View>
-            {loading && <ActivityIndicator />}
-          </View>
-
-          {error && history.length === 0 && (
-            <View style={styles.errorCard}>
-              <Text style={styles.errorText}>Failed to load history: {error}</Text>
-            </View>
-          )}
-
-          {/* Pagination Info */}
-          {history.length > 0 && (
-            <View style={styles.paginationInfo}>
-              <Text style={styles.paginationText}>
-                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} records
-              </Text>
-              <TouchableOpacity 
-                style={styles.refreshButton}
-                onPress={fetchHistory}
-                disabled={loading}
-              >
-                <Text style={styles.refreshButtonText}>
-                  {loading ? "Refreshing..." : "Refresh"}
-                </Text>
+              <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+                <Text style={styles.logoutText}>Logout</Text>
               </TouchableOpacity>
             </View>
-          )}
 
-          {history.length > 0 ? (
-            <>
-              <DataTable
-                columns={[
-                  {
-                    key: "created_at",
-                    title: "Saved At",
-                    render: (value) => (value ? new Date(value).toLocaleString() : "--"),
-                    width: '35%',
-                  },
-                  {
-                    key: "value",
-                    title: "Threshold (°C)",
-                    render: (value) =>
-                      typeof value === "number" ? `${Number(value).toFixed(2)}` : "--",
-                    width: '25%',
-                  },
-                  {
-                    key: "note",
-                    title: "Note",
-                    render: (value) => value || "-",
-                    width: '40%',
-                  },
-                ]}
-                data={paginatedHistory}
-                keyExtractor={(item) => item.id}
-              />
-
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <View style={styles.paginationContainer}>
-                  <TouchableOpacity
-                    style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
-                    onPress={handlePrevPage}
-                    disabled={currentPage === 1}
-                  >
-                    <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
-                      Previous
-                    </Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.pageNumbers}>
-                    {[...Array(Math.min(5, totalPages))].map((_, index) => {
-                      const pageNum = currentPage <= 3 
-                        ? index + 1 
-                        : currentPage >= totalPages - 2 
-                        ? totalPages - 4 + index 
-                        : currentPage - 2 + index;
-                      
-                      if (pageNum > 0 && pageNum <= totalPages) {
-                        return (
-                          <TouchableOpacity
-                            key={pageNum}
-                            style={[
-                              styles.pageNumber,
-                              currentPage === pageNum && styles.pageNumberActive
-                            ]}
-                            onPress={() => goToPage(pageNum)}
-                          >
-                            <Text style={[
-                              styles.pageNumberText,
-                              currentPage === pageNum && styles.pageNumberTextActive
-                            ]}>
-                              {pageNum}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      }
-                      return null;
-                    })}
-                  </View>
-
-                  <TouchableOpacity
-                    style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
-                    onPress={handleNextPage}
-                    disabled={currentPage === totalPages}
-                  >
-                    <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
-                      Next
-                    </Text>
-                  </TouchableOpacity>
+            {/* Threshold Configuration Card */}
+            <View style={styles.card}>
+              <Text style={styles.title}>Configure Temperature Threshold</Text>
+              
+              {latestThreshold !== null && (
+                <View style={styles.currentThreshold}>
+                  <Text style={styles.currentThresholdLabel}>Current Active Threshold:</Text>
+                  <Text style={styles.currentThresholdValue}>
+                    {Number(latestThreshold).toFixed(2)}°C
+                  </Text>
                 </View>
               )}
-            </>
-          ) : (
-            !loading && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>📊</Text>
-                <Text style={styles.emptyStateText}>No threshold history yet</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Configure your first temperature threshold above to get started
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>New Threshold (°C)</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={thresholdValue}
+                  onChangeText={setThresholdValue}
+                  placeholder="Enter temperature value"
+                  placeholderTextColor="#9ca3af"
+                />
+                <Text style={styles.inputHelp}>
+                  Enter value between -50°C and 100°C
                 </Text>
               </View>
-            )
-          )}
 
-          {/* Quick Stats */}
-          {history.length > 0 && (
-            <View style={styles.statsCard}>
-              <Text style={styles.statsTitle}>Configuration Stats</Text>
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{totalItems}</Text>
-                  <Text style={styles.statLabel}>Total Configurations</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Note (Optional) 
+                  <Text style={styles.optionalText}> - describe the reason for this change</Text>
+                </Text>
+                <TextInput
+                  style={[styles.input, styles.noteInput]}
+                  value={note}
+                  onChangeText={setNote}
+                  multiline
+                  numberOfLines={3}
+                  placeholder="e.g., Summer season adjustment, Equipment calibration, Safety precaution..."
+                  placeholderTextColor="#9ca3af"
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {error && (
+                <View style={styles.errorCard}>
+                  <Text style={styles.errorText}>{error}</Text>
                 </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {latestThreshold ? `${Number(latestThreshold).toFixed(2)}°C` : '--'}
+              )}
+
+              <TouchableOpacity
+                style={[styles.button, submitting && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={submitting || !thresholdValue}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    Save Threshold Configuration
                   </Text>
-                  <Text style={styles.statLabel}>Current Threshold</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Threshold History Section */}
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Threshold History</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Recent threshold configurations and changes
+                </Text>
+              </View>
+              {loading && <ActivityIndicator />}
+            </View>
+
+            {error && history.length === 0 && (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>Failed to load history: {error}</Text>
+              </View>
+            )}
+
+            {/* Pagination Info */}
+            {history.length > 0 && (
+              <View style={styles.paginationInfo}>
+                <Text style={styles.paginationText}>
+                  Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} records
+                </Text>
+                <TouchableOpacity 
+                  style={styles.refreshButton}
+                  onPress={fetchHistory}
+                  disabled={loading}
+                >
+                  <Text style={styles.refreshButtonText}>
+                    {loading ? "Refreshing..." : "Refresh"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {history.length > 0 ? (
+              <>
+                {/* Custom DataTable dengan Gesture Support */}
+                <View style={styles.dataTable}>
+                  {/* Table Header */}
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderCell, { width: '35%' }]}>Saved At</Text>
+                    <Text style={[styles.tableHeaderCell, { width: '25%' }]}>Threshold (°C)</Text>
+                    <Text style={[styles.tableHeaderCell, { width: '40%' }]}>Note</Text>
+                  </View>
+                  
+                  {/* Table Rows dengan Swipe Gesture */}
+                  {paginatedHistory.map((item) => (
+                    <Swipeable
+                      key={item.id}
+                      renderRightActions={() => renderTableRowActions(item)}
+                      overshootRight={false}
+                      friction={2}
+                      rightThreshold={40}
+                    >
+                      <TouchableOpacity
+                        style={styles.tableRow}
+                        onPress={() => {
+                          Alert.alert(
+                            "Threshold Details",
+                            `Value: ${item.value}°C\nNote: ${item.note || "No note"}\nCreated: ${new Date(item.created_at).toLocaleString()}`
+                          );
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.tableCell, { width: '35%' }]}>
+                          {item.created_at ? new Date(item.created_at).toLocaleString() : "--"}
+                        </Text>
+                        <Text style={[styles.tableCell, { width: '25%' }]}>
+                          {typeof item.value === "number" ? `${Number(item.value).toFixed(2)}` : "--"}
+                        </Text>
+                        <Text style={[styles.tableCell, { width: '40%' }]}>
+                          {item.note || "-"}
+                        </Text>
+                      </TouchableOpacity>
+                    </Swipeable>
+                  ))}
                 </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {history.filter(item => item.note && item.note.trim() !== '').length}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <View style={styles.paginationContainer}>
+                    <TouchableOpacity
+                      style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+                      onPress={handlePrevPage}
+                      disabled={currentPage === 1}
+                    >
+                      <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+                        Previous
+                      </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.pageNumbers}>
+                      {[...Array(Math.min(5, totalPages))].map((_, index) => {
+                        const pageNum = currentPage <= 3 
+                          ? index + 1 
+                          : currentPage >= totalPages - 2 
+                          ? totalPages - 4 + index 
+                          : currentPage - 2 + index;
+                        
+                        if (pageNum > 0 && pageNum <= totalPages) {
+                          return (
+                            <TouchableOpacity
+                              key={pageNum}
+                              style={[
+                                styles.pageNumber,
+                                currentPage === pageNum && styles.pageNumberActive
+                              ]}
+                              onPress={() => goToPage(pageNum)}
+                            >
+                              <Text style={[
+                                styles.pageNumberText,
+                                currentPage === pageNum && styles.pageNumberTextActive
+                              ]}>
+                                {pageNum}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        }
+                        return null;
+                      })}
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+                      onPress={handleNextPage}
+                      disabled={currentPage === totalPages}
+                    >
+                      <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
+                        Next
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            ) : (
+              !loading && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateIcon}>📊</Text>
+                  <Text style={styles.emptyStateText}>No threshold history yet</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Configure your first temperature threshold above to get started
                   </Text>
-                  <Text style={styles.statLabel}>With Notes</Text>
+                </View>
+              )
+            )}
+
+            {/* Quick Stats */}
+            {history.length > 0 && (
+              <View style={styles.statsCard}>
+                <Text style={styles.statsTitle}>Configuration Stats</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{totalItems}</Text>
+                    <Text style={styles.statLabel}>Total Configurations</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {latestThreshold ? `${Number(latestThreshold).toFixed(2)}°C` : '--'}
+                    </Text>
+                    <Text style={styles.statLabel}>Current Threshold</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {history.filter(item => item.note && item.note.trim() !== '').length}
+                    </Text>
+                    <Text style={styles.statLabel}>With Notes</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -547,6 +585,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
+  // Data Table Styles dengan Gesture Support
+  dataTable: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f9fb',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  tableHeaderCell: {
+    fontWeight: "600",
+    color: "#374151",
+    fontSize: 14,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    backgroundColor: '#fff',
+  },
+  tableCell: {
+    fontSize: 14,
+    color: "#374151",
+  },
   paginationContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -688,5 +763,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6b7280",
     textAlign: 'center',
+  },
+  // Gesture Handler Styles
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    marginVertical: 4,
+    marginRight: 8,
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
   },
 });

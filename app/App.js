@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { enableScreens } from "react-native-screens";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from "./src/context/AuthContext.js";
 import { MonitoringScreen } from "./src/screens/MonitoringScreen";
 import { ControlScreen } from "./src/screens/ControlScreen";
@@ -46,9 +47,27 @@ function AuthenticatedTabs() {
         },
       })}
     >
-      <Tab.Screen name="Monitoring" component={MonitoringScreen} />
-      <Tab.Screen name="Control" component={ControlScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Monitoring" 
+        component={MonitoringScreen}
+        options={{
+          gestureEnabled: true,
+        }}
+      />
+      <Tab.Screen 
+        name="Control" 
+        component={ControlScreen}
+        options={{
+          gestureEnabled: true,
+        }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          gestureEnabled: true,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -62,10 +81,22 @@ function AppNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        gestureEnabled: true,
+        animation: 'slide_from_right',
+      }}
+    >
       {isAuthenticated ? (
         // User sudah login - tampilkan tab navigator
-        <Stack.Screen name="MainTabs" component={AuthenticatedTabs} />
+        <Stack.Screen 
+          name="MainTabs" 
+          component={AuthenticatedTabs}
+          options={{
+            gestureEnabled: false, // Disable gesture untuk root tab navigator
+          }}
+        />
       ) : (
         // User belum login - tampilkan monitoring dan login screen
         <>
@@ -79,6 +110,8 @@ function AppNavigator() {
               headerTintColor: "#1f2937",
               headerStyle: { backgroundColor: "#f8f9fb" },
               headerTitleStyle: { fontWeight: "600", fontSize: 18 },
+              gestureEnabled: true,
+              animation: 'slide_from_right',
             }}
           />
           <Stack.Screen 
@@ -91,6 +124,8 @@ function AppNavigator() {
               headerTintColor: "#1f2937",
               headerStyle: { backgroundColor: "#f8f9fb" },
               headerTitleStyle: { fontWeight: "600", fontSize: 18 },
+              gestureEnabled: true,
+              animation: 'slide_from_right',
             }}
           />
         </>
@@ -133,12 +168,14 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer theme={theme}>
-          <AppNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationContainer theme={theme}>
+            <AppNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

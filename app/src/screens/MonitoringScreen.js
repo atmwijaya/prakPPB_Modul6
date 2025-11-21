@@ -15,6 +15,7 @@ import { DataTable } from "../components/DataTable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext.js";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
 export function MonitoringScreen({ navigation }) {
   const {
@@ -85,205 +86,248 @@ export function MonitoringScreen({ navigation }) {
     return "#10b981";
   };
 
-  return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-      <ScrollView
-        style={styles.container}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+  // Swipe gesture untuk cards
+  const renderCardSwipeActions = (onPress, isPrimary = false) => {
+    return (
+      <TouchableOpacity
+        style={[
+          styles.swipeAction,
+          isPrimary ? styles.swipePrimary : styles.swipeSecondary
+        ]}
+        onPress={onPress}
       >
-        {/* Auth Header */}
-        <View style={styles.authHeader}>
-          <View>
-            <Text style={styles.authTitle}>Sensor Monitoring</Text>
-            {isAuthenticated && (
-              <Text style={styles.userText}>Welcome, {user?.email}</Text>
-            )}
-          </View>
-          <View style={styles.authSection}>
-            {isAuthenticated ? (
-              <View style={styles.authButtons}>
+        <Text style={styles.swipeActionText}>
+          {isPrimary ? 'Open' : 'View'}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+        <ScrollView
+          style={styles.container}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Auth Header */}
+          <View style={styles.authHeader}>
+            <View>
+              <Text style={styles.authTitle}>Sensor Monitoring</Text>
+              {isAuthenticated && (
+                <Text style={styles.userText}>Welcome, {user?.email}</Text>
+              )}
+            </View>
+            <View style={styles.authSection}>
+              {isAuthenticated ? (
+                <View style={styles.authButtons}>
+                  <TouchableOpacity
+                    style={styles.profileButton}
+                    onPress={() =>
+                      navigation.navigate("MainTabs", { screen: "Profile" })
+                    }
+                  >
+                    <Ionicons name="person" size={20} color="#2563eb" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+                    <Text style={styles.logoutText}>Logout</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
                 <TouchableOpacity
-                  style={styles.profileButton}
-                  onPress={() =>
-                    navigation.navigate("MainTabs", { screen: "Profile" })
-                  }
+                  style={styles.loginButton}
+                  onPress={() => navigation.navigate("Login")}
                 >
-                  <Ionicons name="person" size={20} color="#2563eb" />
+                  <Text style={styles.loginText}>Login</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-                  <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.loginButton}
-                onPress={() => navigation.navigate("Login")}
-              >
-                <Text style={styles.loginText}>Login</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Realtime Temperature Card */}
-        <View style={styles.card}>
-          <Text style={styles.title}>Realtime Temperature</Text>
-          <View style={styles.valueRow}>
-            <Text
-              style={[
-                styles.temperatureText,
-                { color: getTemperatureColor(temperature) },
-              ]}
-            >
-              {typeof temperature === "number"
-                ? `${temperature.toFixed(2)}°C`
-                : "--"}
-            </Text>
-            <View style={styles.statusIndicator}>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: getConnectionStatusColor() },
-                ]}
-              />
-              <Text style={styles.statusText}>{connectionState}</Text>
+              )}
             </View>
           </View>
 
-          {timestamp && (
-            <Text style={styles.metaText}>
-              Last update: {new Date(timestamp).toLocaleString()}
-            </Text>
-          )}
-
-          {mqttError && (
-            <Text style={styles.errorText}>MQTT error: {mqttError}</Text>
-          )}
-        </View>
-
-        {/* Quick Actions Card */}
-        <View style={styles.card}>
-          <Text style={styles.title}>Quick Actions</Text>
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              !isAuthenticated && styles.disabledButton,
-            ]}
-            onPress={handleControlAccess}
-            disabled={!isAuthenticated}
+          {/* Realtime Temperature Card dengan Gesture */}
+          <Swipeable
+            renderRightActions={() => renderCardSwipeActions(() => {}, true)}
+            overshootRight={false}
+            friction={2}
+            rightThreshold={40}
           >
-            <Text style={styles.controlButtonText}>
-              {isAuthenticated
-                ? "Go to Control Panel"
-                : "Login to Access Control"}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={onRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <ActivityIndicator size="small" color="#2563eb" />
-            ) : (
-              <Text style={styles.refreshButtonText}>Refresh Data</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Sensor History Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Triggered Readings History</Text>
-          {loading && <ActivityIndicator size="small" />}
-        </View>
-
-        {apiError && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              Failed to load history: {apiError}
-            </Text>
-          </View>
-        )}
-
-        {readings.length > 0 ? (
-          <DataTable
-            columns={[
-              {
-                key: "recorded_at",
-                title: "Timestamp",
-                render: (value) =>
-                  value ? new Date(value).toLocaleString() : "--",
-                width: "40%",
-              },
-              {
-                key: "temperature",
-                title: "Temperature (°C)",
-                render: (value) =>
-                  typeof value === "number"
-                    ? `${Number(value).toFixed(2)}`
-                    : "--",
-                width: "30%",
-              },
-              {
-                key: "threshold_value",
-                title: "Threshold (°C)",
-                render: (value) =>
-                  typeof value === "number"
-                    ? `${Number(value).toFixed(2)}`
-                    : "--",
-                width: "30%",
-              },
-            ]}
-            data={readings}
-            keyExtractor={(item) => item.id}
-          />
-        ) : (
-          !loading && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No sensor readings available
-              </Text>
-              <Text style={styles.emptyStateSubtext}>
-                Sensor data will appear here when temperature thresholds are
-                triggered
-              </Text>
-            </View>
-          )
-        )}
-
-        {/* System Status */}
-        <View style={styles.card}>
-          <Text style={styles.title}>System Status</Text>
-          <View style={styles.statusGrid}>
-            <View style={styles.statusItem}>
-              <Text style={styles.statusLabel}>MQTT Connection</Text>
-              <View style={styles.statusValue}>
-                <View
+            <View style={styles.card}>
+              <Text style={styles.title}>Realtime Temperature</Text>
+              <View style={styles.valueRow}>
+                <Text
                   style={[
-                    styles.statusDot,
-                    { backgroundColor: getConnectionStatusColor() },
+                    styles.temperatureText,
+                    { color: getTemperatureColor(temperature) },
                   ]}
-                />
-                <Text style={styles.statusText}>{connectionState}</Text>
+                >
+                  {typeof temperature === "number"
+                    ? `${temperature.toFixed(2)}°C`
+                    : "--"}
+                </Text>
+                <View style={styles.statusIndicator}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: getConnectionStatusColor() },
+                    ]}
+                  />
+                  <Text style={styles.statusText}>{connectionState}</Text>
+                </View>
               </View>
+
+              {timestamp && (
+                <Text style={styles.metaText}>
+                  Last update: {new Date(timestamp).toLocaleString()}
+                </Text>
+              )}
+
+              {mqttError && (
+                <Text style={styles.errorText}>MQTT error: {mqttError}</Text>
+              )}
             </View>
-            <View style={styles.statusItem}>
-              <Text style={styles.statusLabel}>Data Points</Text>
-              <Text style={styles.statusValueText}>{readings.length}</Text>
+          </Swipeable>
+
+          {/* Quick Actions Card dengan Gesture */}
+          <Swipeable
+            renderRightActions={() => renderCardSwipeActions(handleControlAccess)}
+            overshootRight={false}
+            friction={2}
+            rightThreshold={40}
+          >
+            <View style={styles.card}>
+              <Text style={styles.title}>Quick Actions</Text>
+              <TouchableOpacity
+                style={[
+                  styles.controlButton,
+                  !isAuthenticated && styles.disabledButton,
+                ]}
+                onPress={handleControlAccess}
+                disabled={!isAuthenticated}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.controlButtonText}>
+                  {isAuthenticated
+                    ? "Go to Control Panel"
+                    : "Login to Access Control"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={onRefresh}
+                disabled={refreshing}
+                activeOpacity={0.8}
+              >
+                {refreshing ? (
+                  <ActivityIndicator size="small" color="#2563eb" />
+                ) : (
+                  <Text style={styles.refreshButtonText}>Refresh Data</Text>
+                )}
+              </TouchableOpacity>
             </View>
-            <View style={styles.statusItem}>
-              <Text style={styles.statusLabel}>Authentication</Text>
-              <Text style={styles.statusValueText}>
-                {isAuthenticated ? "Logged In" : "Public Access"}
+          </Swipeable>
+
+          {/* Sensor History Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Triggered Readings History</Text>
+            {loading && <ActivityIndicator size="small" />}
+          </View>
+
+          {apiError && (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>
+                Failed to load history: {apiError}
               </Text>
             </View>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          )}
+
+          {readings.length > 0 ? (
+            <DataTable
+              columns={[
+                {
+                  key: "recorded_at",
+                  title: "Timestamp",
+                  render: (value) =>
+                    value ? new Date(value).toLocaleString() : "--",
+                  width: "40%",
+                },
+                {
+                  key: "temperature",
+                  title: "Temperature (°C)",
+                  render: (value) =>
+                    typeof value === "number"
+                      ? `${Number(value).toFixed(2)}`
+                      : "--",
+                  width: "30%",
+                },
+                {
+                  key: "threshold_value",
+                  title: "Threshold (°C)",
+                  render: (value) =>
+                    typeof value === "number"
+                      ? `${Number(value).toFixed(2)}`
+                      : "--",
+                  width: "30%",
+                },
+              ]}
+              data={readings}
+              keyExtractor={(item) => item.id}
+            />
+          ) : (
+            !loading && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>
+                  No sensor readings available
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Sensor data will appear here when temperature thresholds are
+                  triggered
+                </Text>
+              </View>
+            )
+          )}
+
+          {/* System Status Card dengan Gesture */}
+          <Swipeable
+            renderRightActions={() => renderCardSwipeActions(onRefresh)}
+            overshootRight={false}
+            friction={2}
+            rightThreshold={40}
+          >
+            <View style={styles.card}>
+              <Text style={styles.title}>System Status</Text>
+              <View style={styles.statusGrid}>
+                <View style={styles.statusItem}>
+                  <Text style={styles.statusLabel}>MQTT Connection</Text>
+                  <View style={styles.statusValue}>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: getConnectionStatusColor() },
+                      ]}
+                    />
+                    <Text style={styles.statusText}>{connectionState}</Text>
+                  </View>
+                </View>
+                <View style={styles.statusItem}>
+                  <Text style={styles.statusLabel}>Data Points</Text>
+                  <Text style={styles.statusValueText}>{readings.length}</Text>
+                </View>
+                <View style={styles.statusItem}>
+                  <Text style={styles.statusLabel}>Authentication</Text>
+                  <Text style={styles.statusValueText}>
+                    {isAuthenticated ? "Logged In" : "Public Access"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Swipeable>
+        </ScrollView>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -488,5 +532,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#1f2937",
+  },
+  // Gesture Handler Styles
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 12,
+    marginVertical: 8,
+  },
+  swipePrimary: {
+    backgroundColor: '#2563eb',
+  },
+  swipeSecondary: {
+    backgroundColor: '#10b981',
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
