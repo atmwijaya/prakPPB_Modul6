@@ -22,6 +22,23 @@ export const ThresholdsModel = {
     return data.map(normalize);
   },
 
+  async listPaginated(page = 1, limit = 10) {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const { data, error, count } = await supabase
+      .from(TABLE)
+      .select("id, value, note, created_at", { count: 'exact' })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return {
+      data: data.map(normalize),
+      totalCount: count
+    };
+  },
+
   async latest() {
     const { data, error } = await supabase
       .from(TABLE)
@@ -55,4 +72,13 @@ export const ThresholdsModel = {
     if (error) throw error;
     return normalize(data);
   },
+
+  async getTotalCount() {
+    const { count, error } = await supabase
+      .from(TABLE)
+      .select('*', { count: 'exact', head: true });
+
+    if (error) throw error;
+    return count;
+  }
 };

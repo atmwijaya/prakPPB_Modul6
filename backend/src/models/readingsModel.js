@@ -24,6 +24,23 @@ export const ReadingsModel = {
     return data.map(normalize);
   },
 
+  async listPaginated(page = 1, limit = 10) {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const { data, error, count } = await supabase
+      .from(TABLE)
+      .select("id, temperature, threshold_value, recorded_at", { count: 'exact' })
+      .order("recorded_at", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return {
+      data: data.map(normalize),
+      totalCount: count
+    };
+  },
+
   async latest() {
     const { data, error } = await supabase
       .from(TABLE)
@@ -57,4 +74,13 @@ export const ReadingsModel = {
     if (error) throw error;
     return normalize(data);
   },
+
+  async getTotalCount() {
+    const { count, error } = await supabase
+      .from(TABLE)
+      .select('*', { count: 'exact', head: true });
+
+    if (error) throw error;
+    return count;
+  }
 };
